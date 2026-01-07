@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from controllers.user_controller import create_user as create_user_controller
 
 router = APIRouter()
 
@@ -11,7 +12,4 @@ class User(BaseModel):
 # POST 요청
 @router.post("/users")
 def create_user(user: User):
-    return {
-        "message": "User created successfully",
-        "user": user
-    }
+    return create_user_controller(user)
