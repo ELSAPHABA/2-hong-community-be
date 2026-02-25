@@ -59,3 +59,28 @@ jobs:
         # ECR로 푸시
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    # 4. EC2에 SSM으로 배포 명령 전달
+    - name: Deploy to EC2 via SSM
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: hong-community-be
+        INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+      run: |
+        aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters "commands=[
+            'echo \"Logging in to ECR...\"',
+            'aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY',
+            'echo \"Pulling latest image...\"',
+            'docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest',
+            'echo \"Stopping and removing old container...\"',
+            'docker stop fastapi-app || true',
+            'docker rm fastapi-app || true',
+            'echo \"Starting new container...\"',
+            'docker run -d --name fastapi-app -p 80:8000 $ECR_REGISTRY/$ECR_REPOSITORY:latest',
+            'echo \"Cleanup unused images...\"',
+            'docker image prune -f'
+          ]" \
+          --region ${{ secrets.AWS_REGION }}
