@@ -37,7 +37,7 @@ jobs:
     # 레포지토리가 없으면 생성
     - name: Check or Create ECR Repository
       env:
-        ECR_REPOSITORY: community-api
+        ECR_REPOSITORY: hong-community-be
       run: |
         aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
         aws ecr create-repository --repository-name $ECR_REPOSITORY \
