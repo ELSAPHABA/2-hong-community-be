@@ -21,4 +21,4 @@ COPY . /app/
 
 # uvicorn 실행 (포트 8000 노출은 내부 통신용으로 사용됨)
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["main.handler"]
