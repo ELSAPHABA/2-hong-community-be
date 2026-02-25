@@ -3,8 +3,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from mangum import Mangum  # Lambda handler
 
 from posts import posts_router
 from comments import comments_router
@@ -18,6 +18,9 @@ import models
 
 app = FastAPI()
 
+# Lambda 핸들러 등록
+handler = Mangum(app)
+
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=3600)
 
 app.add_middleware(
@@ -28,8 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 정적 파일 서빙 설정 (이미지 등)
-app.mount("/public", StaticFiles(directory="public"), name="public")
+# 정적 파일 서빙 설정 (S3로 이전되었으므로 로컬 서빙 제거)
+# app.mount("/public", StaticFiles(directory="public"), name="public")
 
 # 게시글 라우터 등록
 app.include_router(posts_router.router)
@@ -46,13 +49,13 @@ app.include_router(users_router.router)
 # 예외 처리기 등록
 register_exception_handlers(app)
 
-# 테이블 생성
-models.Base.metadata.create_all(bind=engine)
+# 테이블 생성 (최초 배포 시에만 필요하거나 Alembic 등으로 관리 권장)
+# models.Base.metadata.create_all(bind=engine)
 
 # 루트 경로
 @app.get("/")
 async def root():
-    return {"message": "Community API Server is running"}
+    return {"message": "Community API Server (Lambda) is running"}
 
 # 서버 실행 (python main.py 실행 간편화)
 # 완성 후 제거
