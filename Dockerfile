@@ -1,24 +1,21 @@
-# Python slim 이미지를 사용하여 메모리 절약
-FROM --platform=linux/amd64 python:3.9-slim
+﻿# 1. AWS Lambda Python 베이스 이미지 사용
+FROM public.ecr.aws/lambda/python:3.9
 
-WORKDIR /app
+# 2. Lambda 환경의 표준 작업 디렉토리 설정
+WORKDIR ${LAMBDA_TASK_ROOT}
 
-# 빌드 시에만 필요한 도구 설치 및 캐시 삭제
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Poetry 설치 (전역 설치 대신 필요한 경우 가상환경 비활성화)
+# 3. 빌드 도구 및 Poetry 설치
 RUN pip install --no-cache-dir poetry
 
-# 의존성 설치 (poetry.lock이 없으면 생성하며 설치됨)
-COPY pyproject.toml /app/
+# 4. 의존성 파일 복사 (poetry.lock이 없는 경우를 대비해 pyproject.toml만 복사)
+COPY pyproject.toml ./
+
+# 5. 의존성 설치
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root
 
-# 소스 코드 복사
-COPY . /app/
+# 6. 전체 소스 코드 복사
+COPY . .
 
-# uvicorn 실행 (포트 8000 노출은 내부 통신용으로 사용됨)
-EXPOSE 8000
+# 7. Lambda 핸들러 설정 (파일명.변수명)
 CMD ["main.handler"]
