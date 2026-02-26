@@ -55,7 +55,7 @@ register_exception_handlers(app)
 # 루트 경로
 @app.get("/")
 async def root():
-    return {"message": "Community API Server (Lambda) is running"}
+    return {"message": "Community API Server is running"}
 
 # 서버 실행 (python main.py 실행 간편화)
 # 완성 후 제거
