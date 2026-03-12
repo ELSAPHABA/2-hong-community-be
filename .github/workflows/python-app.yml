@@ -60,47 +60,41 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-    # 4. EC2에 SSM으로 배포 명령 전달
-    - name: Deploy to EC2 via SSM
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: hong-community-be
-        INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-      run: |
-        aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters "commands=[
-            'echo \"Logging in to ECR...\"',
-            'aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY',
-            'echo \"Pulling latest image...\"',
-            'docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest',
-            'echo \"Stopping and removing old container...\"',
-            'docker stop fastapi-app || true',
-            'docker rm fastapi-app || true',
-            'echo \"Starting new container...\"',
-            'docker run -d --name fastapi-app -p 80:8000 $ECR_REGISTRY/$ECR_REPOSITORY:latest',
-            'echo \"Cleanup unused images...\"',
-            'docker image prune -f'
-          ]" \
-          --region ${{ secrets.AWS_REGION }}
-
-    # 5. Kubernetes (EKS) 배포
-    - name: Deploy to Kubernetes
+    # 4. EC2에 SSM으로 배포 명령 전달 (Standalone Docker + K8s Pods)
+    - name: Deploy to EC2 and K8s via SSM
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: hong-community-be
         IMAGE_TAG: ${{ github.sha }}
-        CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+        INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
       run: |
-        # Kubeconfig 설정 (EKS 클러스터 연결)
-        aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ secrets.AWS_REGION }}
-        
-        # K8s 매니페스트 적용 (Deployment, Service)
-        kubectl apply -f 2-hong-community-be/k8s/
-        
-        # 새로 빌드된 특정 태그 이미지로 업데이트 (롤링 업데이트 트리거)
-        kubectl set image deployment/community-be community-be=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        
-        # 배포 상태 확인
-        kubectl rollout status deployment/community-be
+        # K8s YAML 파일 내용을 변수로 가져오기 (매니페스트 전달용)
+        DEPLOYMENT_YAML=$(cat 2-hong-community-be/k8s/deployment.yaml | sed "s|<AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/hong-community-be:latest|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g")
+        SERVICE_YAML=$(cat 2-hong-community-be/k8s/service.yaml)
+
+        # SSM을 통해 EC2에서 실행할 명령어 조립
+        aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters "commands=[
+            'echo \"1. Logging in to ECR...\"',
+            'aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY',
+            
+            'echo \"2. Standalone Docker Deployment...\"',
+            'docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest',
+            'docker stop fastapi-app || true',
+            'docker rm fastapi-app || true',
+            'docker run -d --name fastapi-app -p 80:8000 $ECR_REGISTRY/$ECR_REPOSITORY:latest',
+            
+            'echo \"3. K8s (on EC2) Deployment...\"',
+            'mkdir -p ~/k8s-deploy',
+            'echo \"$DEPLOYMENT_YAML\" > ~/k8s-deploy/deployment.yaml',
+            'echo \"$SERVICE_YAML\" > ~/k8s-deploy/service.yaml',
+            'kubectl apply -f ~/k8s-deploy/deployment.yaml',
+            'kubectl apply -f ~/k8s-deploy/service.yaml',
+            'kubectl rollout status deployment/community-be',
+            
+            'echo \"4. Cleanup...\"',
+            'docker image prune -f'
+          ]" \
+          --region ${{ secrets.AWS_REGION }}
