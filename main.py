@@ -10,6 +10,7 @@ from posts import posts_router
 from comments import comments_router
 from auth import auth_router
 from users import users_router
+from health import health_router
 from exceptions import register_exception_handlers
 from auth.auth_utils import SECRET_KEY
 
@@ -33,6 +34,9 @@ app.add_middleware(
 
 # 정적 파일 서빙 설정 (S3로 이전되었으므로 로컬 서빙 제거)
 # app.mount("/public", StaticFiles(directory="public"), name="public")
+
+# 헬스 체크 라우터 등록
+app.include_router(health_router.router)
 
 # 게시글 라우터 등록
 app.include_router(posts_router.router)
