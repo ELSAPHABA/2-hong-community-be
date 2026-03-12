@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: community-be
+  labels:
+    app: community-be
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: community-be
+  template:
+    metadata:
+      labels:
+        app: community-be
+    spec:
+      containers:
+      - name: community-be
+        # 이미지 주소는 ECR 설정에 맞춰 변경이 필요합니다.
+        image: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/hong-community-be:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        
+        # 데이터베이스 연결 정보를 Secret에서 참조하도록 설정
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: community-secrets
+              key: database-url
+        
+        # 애플리케이션 시작 확인 (최대 5분 대기: 10초 * 30회)
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8000
+          failureThreshold: 30
+          periodSeconds: 10
+        
+        # 컨테이너 생존 확인
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        
+        # 트래픽 투입 가능 확인 (DB 연결성 검증 포함)
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
