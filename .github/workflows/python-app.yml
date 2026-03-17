@@ -70,8 +70,8 @@ jobs:
         IMAGE_URI: ${{ secrets.IMAGE_URI }}
       run: |
         # K8s YAML 파일 내용을 변수로 가져오기 (매니페스트 전달용)
-        DEPLOYMENT_YAML=$(sed "s|\${IMAGE_URI}|$IMAGE_URI|g" 2-hong-community-be/k8s/deployment.yaml)
-        SERVICE_YAML=$(cat 2-hong-community-be/k8s/service.yaml)
+        DEPLOYMENT_YAML=$(sed "s|\${IMAGE_URI}|$IMAGE_URI|g" k8s/deployment.yaml)
+        SERVICE_YAML=$(cat k8s/service.yaml)
 
         # SSM을 통해 EC2에서 실행할 명령어 조립
         aws ssm send-command \
