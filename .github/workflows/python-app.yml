@@ -67,9 +67,10 @@ jobs:
         ECR_REPOSITORY: hong-community-be
         IMAGE_TAG: ${{ github.sha }}
         INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+        IMAGE_URI: ${{ secrets.IMAGE_URI }}
       run: |
         # K8s YAML 파일 내용을 변수로 가져오기 (매니페스트 전달용)
-        DEPLOYMENT_YAML=$(cat 2-hong-community-be/k8s/deployment.yaml | sed "s|<AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/hong-community-be:latest|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g")
+        DEPLOYMENT_YAML=$(sed "s|\${IMAGE_URI}|$IMAGE_URI|g" 2-hong-community-be/k8s/deployment.yaml)
         SERVICE_YAML=$(cat 2-hong-community-be/k8s/service.yaml)
 
         # SSM을 통해 EC2에서 실행할 명령어 조립
